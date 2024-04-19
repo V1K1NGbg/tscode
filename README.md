@@ -1,0 +1,2 @@
+# tscode
+Terminal Studio Code
