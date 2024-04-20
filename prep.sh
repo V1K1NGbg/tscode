@@ -2,12 +2,12 @@
 
 apt-get update -y 
 apt-get full-upgrade -y 
-apt-get install -y git make curl vim ranger tmux libnss3 libasound2 xdg-utils
+apt-get install -y git make curl vim ranger tmux libnss3 libasound2 xdg-utils neofetch
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash 
 source /root/.bashrc
 nvm install node 
-npm install -g gtop 
+npm install -g vtop 
 npm install -g carbonyl
 
 
