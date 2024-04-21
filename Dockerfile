@@ -1,33 +1,29 @@
 
 FROM ubuntu:latest
 
+ENV debug=0
+ENV website=https://google.com
+# nano, vim, ranger
+ENV editor=ranger
+# carbonyl, links, lynx
+ENV browser=carbonyl
+# vtop, htop, gtop, top
+ENV top=vtop
+
 RUN apt-get update -y && \
     apt-get full-upgrade -y && \
-    apt-get install -y make libnss3 libasound2 xdg-utils git curl nano vim ranger tmux neofetch && \
+    apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links htop && \
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended && \
-    #node
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash && \
     source /root/.bashrc && \
-    #java
-    apt-get install -y openjdk-21-jdk&& \
-    #lua
+    apt-get install -y openjdk-21-jdk && \
     apt-get install -y lua5.4 && \
-    #go
-    rm -rf /usr/local/go && \
-    tar -C /usr/local -xzf go1.22.2.linux-amd64.tar.gz && \ 
-    #docker
-    # apt-get install -y ca-certificates
-    # install -m 0755 -d /etc/apt/keyrings 
-    # curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 
-    # chmod a+r /etc/apt/keyrings/docker.asc 
-    # echo \
-    # "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-    # $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    # tee /etc/apt/sources.list.d/docker.list > /dev/null 
-    # apt-get update -y 
-    # apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    apt-get install -y build-essential gdb cmake && \
+    apt-get install -y python3 python3-pip && \
     nvm install node && \
     npm install -g vtop && \
+    npm install -g gtop && \
     npm install -g carbonyl && \
     mkdir /data && \
     LANG=en_US.utf8 && \
@@ -35,3 +31,7 @@ RUN apt-get update -y && \
 
 VOLUME [ "/data" ]
 WORKDIR /data
+
+CMD [[ ${debug} -eq 0 ]] && tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0 || tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v neofetch \; select-pane -t 0
+
+EXPOSE 22

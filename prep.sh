@@ -2,23 +2,22 @@
 
 apt-get update -y 
 apt-get full-upgrade -y 
-apt-get install -y git make curl vim ranger tmux libnss3 libasound2 xdg-utils neofetch
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
+apt-get install -y make libnss3 libasound2 xdg-utils git curl nano vim ranger tmux neofetch 
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended 
+#node
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash 
-source /root/.bashrc
-nvm install node 
-npm install -g vtop 
-npm install -g carbonyl
-
-
-mkdir /data
-LANG=en_US.utf8
-export LANG
-
-
-
-
-
+source /root/.bashrc 
+#java
+apt-get install -y openjdk-21-jdk 
+#lua
+apt-get install -y lua5.4 
+#rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 
+#c/c++
+apt-get install -y build-essential gdb cmake 
+#python
+apt-get install -y python3 python3-pip 
+#docker
 # apt-get install -y ca-certificates
 # install -m 0755 -d /etc/apt/keyrings 
 # curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 
@@ -29,4 +28,9 @@ export LANG
 # tee /etc/apt/sources.list.d/docker.list > /dev/null 
 # apt-get update -y 
 # apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
-
+nvm install node 
+npm install -g vtop 
+npm install -g carbonyl 
+mkdir /data 
+LANG=en_US.utf8 
+export LANG
