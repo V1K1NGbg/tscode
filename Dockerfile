@@ -1,15 +1,6 @@
 
 FROM ubuntu:latest
 
-ENV debug=0
-ENV website=https://google.com
-# nano, vim, ranger
-ENV editor=ranger
-# carbonyl, links, lynx
-ENV browser=carbonyl
-# vtop, htop, gtop, top
-ENV top=vtop
-
 RUN apt-get update -y && \
     apt-get full-upgrade -y && \
     apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links htop && \
@@ -23,7 +14,7 @@ RUN apt-get update -y && \
     apt-get install -y python3 python3-pip && \
     nvm install node && \
     npm install -g vtop && \
-    npm install -g gtop && \
+    npm install -g gtop &&  \
     npm install -g carbonyl && \
     mkdir /data && \
     LANG=en_US.utf8 && \
@@ -32,6 +23,18 @@ RUN apt-get update -y && \
 VOLUME [ "/data" ]
 WORKDIR /data
 
-CMD [[ ${debug} -eq 0 ]] && tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0 || tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v neofetch \; select-pane -t 0
+ENV more_stats=0
+ENV email=email@example.com
+ENV website=https://duckduckgo.com/
+# nano, vim, ranger
+ENV editor=ranger
+# carbonyl, links, lynx
+ENV browser=carbonyl
+# vtop, htop, gtop, top
+ENV top=vtop
+
+
+CMD [ -f ~/.ssh/id_rsa ] || ssh-keygen -t rsa -b 4096 -C "${email}" -f ~/.ssh/id_rsa && cp ~/.ssh/id_rsa.pub /data && \
+    [[ ${more_stats} -eq 0 ]] && tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0 || tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v neofetch \; select-pane -t 0
 
 EXPOSE 22
