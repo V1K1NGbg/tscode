@@ -16,12 +16,13 @@ RUN apt-get update -y && \
     npm install -g vtop && \
     npm install -g gtop &&  \
     npm install -g carbonyl && \
-    mkdir /data && \
+    mkdir /root/data && \
     LANG=en_US.utf8 && \
-    export LANG
+    export LANG && \
+    cd /root/data
 
-VOLUME [ "/data" ]
-WORKDIR /data
+VOLUME [ "/root/data" ]
+WORKDIR /root/data
 
 ENV more_stats=0
 ENV email=email@example.com
@@ -34,7 +35,7 @@ ENV browser=carbonyl
 ENV top=vtop
 
 
-CMD [ -f ~/.ssh/id_rsa ] || ssh-keygen -t rsa -b 4096 -C "${email}" -f ~/.ssh/id_rsa && cp ~/.ssh/id_rsa.pub /data && \
+CMD [ -f ~/.ssh/id_rsa ] || ssh-keygen -t rsa -b 4096 -C "${email}" -f ~/.ssh/id_rsa && cp ~/.ssh/id_rsa.pub /data/.ssh_key.pub && \
     [[ ${more_stats} -eq 0 ]] && tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0 || tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v neofetch \; select-pane -t 0
 
 EXPOSE 22
