@@ -45,7 +45,7 @@ ENV website=https://google.com
 # nano, vim, ranger
 ENV editor=ranger
 # carbonyl --no-sandbox, links, lynx
-ENV browser="carbonyl --no-sandbox"
+ENV browser="links"
 # vtop, htop, gtop, top
 ENV top=vtop
 
