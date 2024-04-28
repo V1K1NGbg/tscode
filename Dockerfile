@@ -6,7 +6,7 @@ SHELL ["/bin/bash", "--login", "-i", "-c"]
 RUN apt-get update -y && \
     apt-get full-upgrade -y
 
-RUN apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links htop
+RUN apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links elinks htop
 
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
 
@@ -44,17 +44,19 @@ ENV email=email@example.com
 ENV website=https://google.com
 # nano, vim, ranger
 ENV editor=ranger
-# carbonyl --no-sandbox, links, lynx
-ENV browser="links"
+# carbonyl --no-sandbox, links, lynx, elinks
+ENV browser="elinks"
 # vtop, htop, gtop, top
 ENV top=vtop
 
 
-CMD cp /root/data/.bashrc /root/.bashrc && \
-    cp /root/data/.vimrc /root/.vimrc && \
-    cp /root/data/.tmux.conf /root/.tmux.conf && \
-    cp /root/data/rc.conf /root/.config/ranger/rc.conf && \
-    if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && cp /root/.ssh/id_rsa.pub /root/data/ ; fi && \
+CMD if [ -e /root/data/.bashrc ] ; then echo "Copying .bashrc" && /bin/cp -rf /root/data/.bashrc /root/.bashrc ; else echo ".bashrc file does not exist." ; fi && \
+    if [ -e /root/data/.vimrc ] ; then echo "Copying .vimrc" && /bin/cp -rf /root/data/.vimrc /root/.vimrc ; else echo ".vimrc file does not exist." ; fi && \
+    if [ -e /root/data/.tmux.conf ] ; then echo "Copying .tmux.conf" && /bin/cp -rf /root/data/.tmux.conf /root/.tmux.conf ; else echo ".tmux.conf file does not exist." ; fi && \
+    if [ -e /root/data/.ranger.conf ] ; then echo "Copying .ranger.conf" && /bin/cp -rf /root/data/.ranger.conf /root/.config/ranger/rc.conf ; else echo ".ranger.conf file does not exist." ; fi && \
+    chmod +x /root/data/startup.sh && \
+    . /root/data/startup.sh && \
+    if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/ ; fi && \
     if [ ${more_stats} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
