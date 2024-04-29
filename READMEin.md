@@ -19,6 +19,8 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
 - Monitoring tools:
     - `vtop`
     - `gtop`
+    - `htop`
+    - `top`
 - Runtime environment variables:
     - more_stats (debug, default:`0`)
     - email (for the ssh key, default:`email@example.com`)
