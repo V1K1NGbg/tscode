@@ -3,7 +3,7 @@ FROM ubuntu:latest
 
 SHELL ["/bin/bash", "--login", "-i", "-c"]
 
-RUN apt-get update -y && \
+RUN apt-get update -y --fix-missing && \
     apt-get full-upgrade -y
 
 RUN apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links elinks htop
@@ -50,17 +50,13 @@ ENV browser="elinks"
 ENV top=vtop
 
 
-CMD if [ -e /root/data/.bashrc ] ; then echo "Copying .bashrc" && /bin/cp -rf /root/data/.bashrc /root/.bashrc ; else echo ".bashrc file does not exist." ; fi && \
-    if [ -e /root/data/.vimrc ] ; then echo "Copying .vimrc" && /bin/cp -rf /root/data/.vimrc /root/.vimrc ; else echo ".vimrc file does not exist." ; fi && \
-    if [ -e /root/data/.tmux.conf ] ; then echo "Copying .tmux.conf" && /bin/cp -rf /root/data/.tmux.conf /root/.tmux.conf ; else echo ".tmux.conf file does not exist." ; fi && \
-    if [ -e /root/data/.ranger.conf ] ; then echo "Copying .ranger.conf" && /bin/cp -rf /root/data/.ranger.conf /root/.config/ranger/rc.conf ; else echo ".ranger.conf file does not exist." ; fi && \
-    chmod +x /root/data/startup.sh && \
-    . /root/data/startup.sh && \
-    if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/ ; fi && \
+CMD if [ -d /root/data/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/data/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
+    if [ -f /root/data/startup-docker.sh ]; then echo "Running startup-docker.sh" && chmod +x /root/data/startup-docker.sh && . /root/data/startup-docker.sh ; else echo "No startup-docker.sh to run" ; fi && \
+    if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/.ssh-key/ ; fi && \
     if [ ${more_stats} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
-    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && bash' \; select-pane -t 0) ; \
+    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && sh' \; select-pane -t 0) ; \
     fi
 
 EXPOSE 22
