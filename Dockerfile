@@ -6,7 +6,9 @@ SHELL ["/bin/bash", "--login", "-i", "-c"]
 RUN apt-get update -y --fix-missing && \
     apt-get full-upgrade -y
 
-RUN apt-get install -y make libnss3 libasound2 xdg-utils openssh-server git curl nano vim ranger tmux neofetch lynx links elinks htop
+RUN apt-get install -y make libnss3 xdg-utils git curl nano vim ranger tmux neofetch lynx links elinks htop
+# RUN apt-get install -y make libnss3 libasound2 (not found) xdg-utils openssh-server (for ssh) git curl nano vim ranger tmux neofetch lynx links elinks htop
+
 
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
 
@@ -40,7 +42,6 @@ VOLUME [ "/root/data" ]
 WORKDIR /root/data
 
 ENV more_stats=0
-ENV email=email@example.com
 ENV website=https://google.com
 # nano, vim, ranger
 ENV editor=ranger
@@ -52,11 +53,11 @@ ENV top=vtop
 
 CMD if [ -d /root/data/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/data/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
     if [ -f /root/data/startup-docker.sh ]; then echo "Running startup-docker.sh" && chmod +x /root/data/startup-docker.sh && . /root/data/startup-docker.sh ; else echo "No startup-docker.sh to run" ; fi && \
-    if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/.ssh-key/ ; fi && \
+    # if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/.ssh-key/ ; fi && \
     if [ ${more_stats} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && sh' \; select-pane -t 0) ; \
     fi
 
-EXPOSE 22
+# EXPOSE 22
