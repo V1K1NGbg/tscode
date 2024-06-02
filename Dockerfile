@@ -34,11 +34,12 @@ RUN npm install -g carbonyl
 RUN mkdir /root/data && \
     mkdir /root/.config && \
     mkdir /root/.config/ranger && \
-    echo 'export LANG=en_US.UTF-8' >> ~/.bashrc && \
+    mkdir /root/.config/.tscode && \
+    echo 'export LANG=en_US.UTF-8' >> /root/.bashrc && \
     . /root/.bashrc && \
     cd /root/data
 
-VOLUME [ "/root/data" ]
+VOLUME [ "/root/data", "/root/.config/.tscode" ]
 WORKDIR /root/data
 
 ENV more_stats=0
@@ -51,13 +52,13 @@ ENV browser="elinks"
 ENV top=vtop
 
 
-CMD if [ -d /root/data/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/data/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
-    if [ -f /root/data/startup-docker.sh ]; then echo "Running startup-docker.sh" && chmod +x /root/data/startup-docker.sh && . /root/data/startup-docker.sh ; else echo "No startup-docker.sh to run" ; fi && \
+CMD if [ -d /root/.config/.tscode/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/.config/.tscode/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
+    if [ -f /root/.config/.tscode/startup-docker.sh ]; then echo "Running startup-docker.sh" && chmod +x /root/.config/.tscode/startup-docker.sh && . /root/.config/.tscode/startup-docker.sh ; else echo "No startup-docker.sh to run" ; fi && \
     # if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/.ssh-key/ ; fi && \
     if [ ${more_stats} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
-    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && sh' \; select-pane -t 0) ; \
+    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && cat /root/.config/.tscode/README && sh' \; select-pane -t 0) ; \
     fi
 
 # EXPOSE 22

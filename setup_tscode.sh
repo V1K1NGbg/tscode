@@ -1,17 +1,24 @@
 #!/bin/bash
 
-# echo "Pulling the latest image ..."
+echo "Pulling the latest image ..."
 
-# docker pull v1k1ngbg/tscode:latest
+docker pull v1k1ngbg/tscode:latest
 
-mkdir -p ~/.tscode
+echo "Copying the files ..."
 
-cp tscode.sh ~/.tscode/tscode.sh
+cp -ru .tscode ~
+
+echo "Setting up the app ..."
 
 chmod +x ~/.tscode/tscode.sh
 
-if ! grep -Fxq 'alias tscode="~/.tscode/tscode.sh' "~/.bashrc"; then
-    echo 'alias tscode="~/.tscode/tscode.sh"' >> ~/.bashrc
+echo "Setting up the alias ..."
+
+if grep -q '^alias tscode' ~/.bashrc; then
+    grep -v '^alias tscode' ~/.bashrc > temp
+    mv temp ~/.bashrc
 fi
+
+echo $'\nalias tscode="~/.tscode/tscode.sh"' >> ~/.bashrc
 
 source ~/.bashrc

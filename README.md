@@ -40,36 +40,34 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
 
 ### Installation (CLI)
 
-- Run tscode.sh `./tscode.sh`
+- Run the setup script: `./setup_tscode.sh`
 
 ## Usage
 
 ### Usage with CLI (Recommended)
 
-
+`tscode <file>` - Run tscode with a specific directory
 
 ### Usage with Docker Command
 
-### Configuration locations
+`docker run -it --hostname tscode --name tscode --rm -v {somewhere}:/root/data/ -v {.tscode location}:/root/.config/.tscode v1k1ngbg/ts-code:latest`
+
+## Configuration Files
+
+### !In your home directory!
 
 ```
-data
+.tscode
 ├── .config-docker
-│   ├── .bashrc
-│   ├── .config
-│   │   └── ranger
-│   │       ├── rc.conf
-│   │       ├── rifle.conf
-│   │       └── scope.sh
-│   ├── .tmux.conf
-│   └── .vimrc
-└── startup-docker.sh
+│   ├── .bashrc
+│   ├── .config
+│   │   └── ranger
+│   │       ├── rc.conf
+│   │       ├── rifle.conf
+│   │       └── scope.sh
+│   ├── .tmux.conf
+│   └── .vimrc
+├── README
+├── startup-docker.sh
+└── tscode.sh
 ```
-
-#### Interactive Mode
-
-`docker run -it --hostname tscode --name tscode --rm -v {somewhere}/data/:/root/data/ v1k1ngbg/ts-code:latest`
-
-#### Detached Mode
-
-`docker run -d --hostname tscode --rm -v {somewhere}/data/:/root/data/ v1k1ngbg/ts-code:latest`
