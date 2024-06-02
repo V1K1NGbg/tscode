@@ -24,13 +24,13 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
     - `htop`
     - `top`
 - Runtime environment variables:
-    - more_stats (debug, default:`0`)
+    - debug (debug for some stats and a tutorial on how to use the app, default:`0`)
     - website (the startup website, default:`https://google.com`)
     - editor (the startup editor, default:`ranger`, options:`nano`, `vim`, `ranger`)
     - browser (the startup browser, default:`elinks`, options:`carbonyl --no-sandbox`, `links`, `lynx`, `elinks`)
     - top (the startup top (only in debug mode), default:`vtop`, options:`vtop`, `htop`, `gtop`, `top`)
-- If a `.config-docker` directory exists in `data`, its contents will be copied to the container during container startup.
-- If a `startup-docker.sh` script is provided in `data`, it will be executed during container startup.
+- If a `.config-docker` directory exists in `.tscode`, its contents will be copied to the container during container startup.
+- If a `startup-docker.sh` script is provided in `.tscode`, it will be executed during container startup.
 
 ## Set Up
 
@@ -47,14 +47,15 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
 ### Usage with CLI (Recommended)
 
 `tscode <file>` - Run tscode with a specific directory
+`tscodeconf <variable> <value>` - Change runtime environment variables
 
 ### Usage with Docker Command
 
-`docker run -it --hostname tscode --name tscode --rm -v {somewhere}:/root/data/ -v {.tscode location}:/root/.config/.tscode v1k1ngbg/ts-code:latest`
+`docker run -it --hostname tscode --name tscode --rm -v {a folder to open}:/root/data/ -v ~/.tscode:/root/.config/.tscode v1k1ngbg/tscode:latest`
 
 ## Configuration Files
 
-### !In your home directory!
+### ! In your home directory !
 
 ```
 .tscode
@@ -67,7 +68,8 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
 │   │       └── scope.sh
 │   ├── .tmux.conf
 │   └── .vimrc
-├── README
+├── config.conf
+├── README.md
 ├── startup-docker.sh
 └── tscode.sh
 ```

@@ -42,7 +42,7 @@ RUN mkdir /root/data && \
 VOLUME [ "/root/data", "/root/.config/.tscode" ]
 WORKDIR /root/data
 
-ENV more_stats=0
+ENV debug=0
 ENV website=https://google.com
 # nano, vim, ranger
 ENV editor=ranger
