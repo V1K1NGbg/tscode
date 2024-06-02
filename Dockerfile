@@ -35,6 +35,8 @@ RUN mkdir /root/data && \
     mkdir /root/.config && \
     mkdir /root/.config/ranger && \
     mkdir /root/.config/.tscode && \
+    touch /root/.vimrc && \
+    touch /root/.tmux.conf && \
     echo 'export LANG=en_US.UTF-8' >> /root/.bashrc && \
     . /root/.bashrc && \
     cd /root/data
@@ -58,7 +60,7 @@ CMD if [ -d /root/.config/.tscode/.config-docker ]; then echo "Copying files fro
     if [ ${more_stats} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
-    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && cat /root/.config/.tscode/README && sh' \; select-pane -t 0) ; \
+    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && cat /root/.config/.tscode/README.md && sh' \; select-pane -t 0) ; \
     fi
 
 # EXPOSE 22
