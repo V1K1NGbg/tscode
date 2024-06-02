@@ -1,7 +1,23 @@
-docker attach (attach)
+# Tutorial
 
-CTRL + p; CTRL + q (detach)
+## Navigation
 
-CTRL + a; CTRL + x (stop)
+### Moving
 
-to make configurations permanent: cp sdfsdfdsfsdfsdf
+- ALT + h,j,k,l (left, down, up, right)
+
+### Creating new windows
+
+- CTRL + a -> | (horizontal split)
+
+- CTRL + a -> _ (vertical split)
+
+### Exiting
+
+- CTRL + a -> CTRL + x (stop)
+
+- CTRL + p -> CTRL + q (detach)
+
+### Attaching
+
+- docker attach (attach)

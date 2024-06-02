@@ -35,8 +35,6 @@ RUN mkdir /root/data && \
     mkdir /root/.config && \
     mkdir /root/.config/ranger && \
     mkdir /root/.config/.tscode && \
-    touch /root/.vimrc && \
-    touch /root/.tmux.conf && \
     echo 'export LANG=en_US.UTF-8' >> /root/.bashrc && \
     . /root/.bashrc && \
     cd /root/data
