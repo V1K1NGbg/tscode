@@ -71,5 +71,7 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
 ├── config.conf
 ├── README.md
 ├── startup-docker.sh
-└── tscode.sh
+├── tscode.sh
+├── tscode_edit_conf.sh
+└── tscode_gen_conf.sh
 ```
