@@ -26,9 +26,9 @@ case $1 in
         fi
         ;;
     "browser")
-        valid_values=("carbonyl --no-sandbox" "links" "lynx" "elinks")
+        valid_values=("carbonyl" "links" "lynx" "elinks")
         if [[ ! " ${valid_values[@]} " =~ " ${2} " ]]; then
-            echo "Invalid value for browser. Choose between carbonyl --no-sandbox, links, lynx, elinks."
+            echo "Invalid value for browser. Choose between carbonyl, links, lynx, elinks."
             exit 1
         fi
         ;;

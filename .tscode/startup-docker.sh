@@ -1,3 +1,3 @@
 #!/bin/bash
 
-# echo "Set up ..."
+# echo "Set up ..." (start service or install something here)

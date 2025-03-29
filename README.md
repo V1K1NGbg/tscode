@@ -27,7 +27,7 @@ Ubuntu-based image with a set of pre-installed tools and configurations tailored
     - debug (debug for some stats and a tutorial on how to use the app, default:`0`)
     - website (the startup website, default:`https://google.com`)
     - editor (the startup editor, default:`ranger`, options:`nano`, `vim`, `ranger`)
-    - browser (the startup browser, default:`elinks`, options:`carbonyl --no-sandbox`, `links`, `lynx`, `elinks`)
+    - browser (the startup browser, default:`elinks`, options:`carbonyl`, `links`, `lynx`, `elinks`)
     - top (the startup top (only in debug mode), default:`vtop`, options:`vtop`, `htop`, `gtop`, `top`)
 - If a `.config-docker` directory exists in `.tscode`, its contents will be copied to the container during container startup.
 - If a `startup-docker.sh` script is provided in `.tscode`, it will be executed during container startup.

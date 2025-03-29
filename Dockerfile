@@ -46,19 +46,20 @@ ENV debug=0
 ENV website=https://google.com
 # nano, vim, ranger
 ENV editor=ranger
-# carbonyl --no-sandbox, links, lynx, elinks
+# carbonyl, links, lynx, elinks
 ENV browser="elinks"
 # vtop, htop, gtop, top
 ENV top=vtop
 
 
-CMD if [ -d /root/.config/.tscode/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/.config/.tscode/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
+CMD if [ "$browser" == "carbonyl" ]; then export browser="carbonyl --no-sandbox"; fi && \
+    if [ -d /root/.config/.tscode/.config-docker ]; then echo "Copying files from .config-docker" && /bin/cp -rf /root/.config/.tscode/.config-docker/. /root ; else echo "No files to copy from .config-docker" ; fi && \
     if [ -f /root/.config/.tscode/startup-docker.sh ]; then echo "Running startup-docker.sh" && chmod +x /root/.config/.tscode/startup-docker.sh && . /root/.config/.tscode/startup-docker.sh ; else echo "No startup-docker.sh to run" ; fi && \
     # if [ ! -f /root/.ssh/id_rsa ] ; then ssh-keygen -t ed25519 -C "${email}" -f /root/.ssh/id_rsa && /bin/cp -rf /root/.ssh/id_rsa.pub /root/data/.ssh-key/ ; fi && \
-    if [ ${more_stats} -eq 0 ] ; then \
+    if [ ${debug} -eq 0 ] ; then \
     (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; select-pane -t 0) ; \
     else \
-    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch && cat /root/.config/.tscode/README.md && sh' \; select-pane -t 0) ; \
+    (tmux new-session ${editor} \; split-window -h '${browser} ${website}' \; split-window -v \; split-window -h ${top} \; split-window -v -d 'neofetch | less' \; split-window -h 'less /root/.config/.tscode/README.md' \; select-pane -t 0) ; \
     fi
 
 # EXPOSE 22
