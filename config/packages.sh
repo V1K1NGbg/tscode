@@ -22,7 +22,13 @@ ensure_node() {
 
 ensure_tool() {
     case "$1" in
-        core) apt_packages tmux less git curl ca-certificates ;;
+        core)
+            apt_packages tmux less git curl ca-certificates ranger file nano sensible-utils \
+                libnss3 libexpat1 libasound2t64 libfontconfig1 || return
+            ensure_node || return
+            type -P opencode >/dev/null || npm install --global opencode-ai || return
+            type -P carbonyl >/dev/null || npm install --global carbonyl || return
+            ;;
         python) apt_packages python3 python3-pip python3-venv ;;
         java) apt_packages openjdk-25-jdk ;;
         lua) apt_packages lua5.4 ;;
@@ -32,21 +38,6 @@ ensure_tool() {
             apt_packages build-essential curl ca-certificates || return
             if ! command -v rustc >/dev/null || ! command -v cargo >/dev/null; then
                 run_installer https://sh.rustup.rs -y --profile minimal --default-toolchain stable --no-modify-path || return
-            fi
-            ;;
-        ranger) apt_packages ranger file nano sensible-utils ;;
-        nano|vim|elinks|links|lynx|htop) apt_packages "$1" ;;
-        top) apt_packages procps ;;
-        carbonyl|vtop|gtop)
-            ensure_node || return
-            if [ "$1" = carbonyl ]; then
-                apt_packages libnss3 libexpat1 libasound2t64 libfontconfig1 || return
-            fi
-            if ! command -v "$1" >/dev/null; then
-                npm install --global "$1" || return
-            fi
-            if [ "$1" = carbonyl ]; then
-                carbonyl --no-sandbox --version >/dev/null || return
             fi
             ;;
         *) printf 'Unknown tool: %s\n' "$1" >&2; return 1 ;;

@@ -14,3 +14,7 @@ tscode-install() {
 # Workspace controls; plain `exit` still closes only the current shell pane.
 tscode-exit() { tmux kill-session -t tscode; }
 tscode-detach() { tmux detach-client; }
+
+# Commands used by the default pane list.
+shell() { exec /bin/bash -i; }
+carbonyl() { command carbonyl --no-sandbox "$@"; }

@@ -48,7 +48,7 @@ exit 0
 STUB
 chmod +x "$work/bin/docker"
 export PATH="$work/bin:$PATH"
-printf 'editor=vim' > "$TSCODE_CONFIG_DIR/config.conf"
+printf 'editor=vim\ndebug=1\npanes=default' > "$TSCODE_CONFIG_DIR/config.conf"
 printf 'custom hook\n' > "$TSCODE_CONFIG_DIR/startup-docker.sh"
 printf 'custom overlay\n' > "$TSCODE_CONFIG_DIR/.config-docker/.bashrc"
 printf '# existing login profile\n' > "$TSCODE_HOME/.profile"
@@ -65,8 +65,9 @@ if grep -q '^alias tscode=' "$TSCODE_HOME/.bashrc"; then exit 1; fi
 grep -q '^alias keep=' "$TSCODE_HOME/.bashrc"
 grep -qx 'custom hook' "$TSCODE_CONFIG_DIR/startup-docker.sh"
 grep -qx 'custom overlay' "$TSCODE_CONFIG_DIR/.config-docker/.bashrc"
-grep -qx 'editor=vim' "$TSCODE_CONFIG_DIR/config.conf"
-[ "$(grep -c '=' "$TSCODE_CONFIG_DIR/config.conf")" = 5 ]
+grep -qx 'editor=vim' "$TSCODE_CONFIG_DIR/config.conf.before-commands"
+grep -qx 'panes=ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' "$TSCODE_CONFIG_DIR/config.conf"
+[ "$(grep -c '=' "$TSCODE_CONFIG_DIR/config.conf")" = 1 ]
 bash -c '. "$TSCODE_HOME/.bashrc"; command -v tscode' | grep -F "$TSCODE_HOME/.local/bin/tscode"
 if command -v zsh >/dev/null; then
     zsh -c '. "$ZDOTDIR/.zshrc"; command -v tscode' | grep -F "$TSCODE_HOME/.local/bin/tscode"
@@ -74,8 +75,18 @@ fi
 
 cli="$TSCODE_HOME/.local/bin/tscode"
 conf="$TSCODE_HOME/.local/bin/tscodeconf"
-# shellcheck disable=SC2016 # Verify shell syntax stays literal.
-"$conf" website 'https://example.com/?a=1&b=$(false)'
+# Commands are saved literally, never executed by config validation or host startup.
+"$conf" panes "touch '$work/should-not-run';0:right:50:printf '%s' 'https://example.com/a:b' && shell"
+[ ! -e "$work/should-not-run" ]
+cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
+for value in '' ' ' ';shell' 'shell;' 'shell;;bash' 'shell;1:right:50:bash' 'shell;0:up:50:bash' 'shell;0:right:0:bash' 'shell;0:right:100:bash' 'shell;00:right:50:bash' 'shell;99999999999999999999:right:50:bash' 'shell;0:right:50: '; do
+    expect_failure "$conf" panes "$value"
+done
+for key in editor browser top debug website layout editor_width shell_height top_width help_height; do
+    expect_failure "$conf" "$key" ignored
+done
+expect_failure "$conf" panes $'shell\npanes=bash'
+cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 "$cli" "$work/project space"
 grep -Fx "<$work/project space:/home/tscode/project>" "$TEST_LOG"
 grep -Fx "<$TSCODE_CONFIG_DIR:/config>" "$TEST_LOG"
@@ -85,16 +96,12 @@ for directory in usr etc var; do
     grep -Fx "<type=volume,source=tscode-ubuntu26.04-v1-arm64-packages,target=/$directory,volume-subpath=$directory,volume-nocopy>" "$TEST_LOG"
 done
 cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
-for value in 2 abc '1+0'; do
-    expect_failure "$conf" debug "$value"
-done
-expect_failure "$conf" website $'https://example.com\neditor=nano'
-expect_failure "$conf" 'debug editor' 1
+expect_failure "$conf" 'panes other' shell
 cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$cli" "$work/missing"
-printf 'editor=nano\n' >> "$TSCODE_CONFIG_DIR/config.conf"
+printf 'panes=bash\n' >> "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$cli" "$work/project space"
-"$conf" editor nano
+"$conf" panes shell
 "$cli" "$work/project space"
 DOCKER_STATUS=1 expect_failure bash "$repo/install.sh"
 
@@ -203,11 +210,11 @@ TSCODE_UID=123 TSCODE_GID='' expect_failure validate_workspace_user
 # Display defaults without creating config; existing values remain literal and unchanged.
 TSCODE_CONFIG_DIR="$work/no-config" "$conf" --show > "$work/shown"
 [ ! -e "$work/no-config" ]
-grep -qx editor=ranger "$work/shown"
+grep -qx 'panes=ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' "$work/shown"
 cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
-"$conf" --show | grep -x editor=nano
+"$conf" --show | grep -x panes=shell
 cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
-printf 'editor=vim\n' >> "$TSCODE_CONFIG_DIR/config.conf"
+printf 'panes=bash\n' >> "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$conf" --show
 cp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 
@@ -272,7 +279,7 @@ IMAGE_MISSING=1 bash "$repo/install.sh"
 grep -Fx '<pull>' "$TEST_LOG"
 if grep -qx '<build>' "$TEST_LOG"; then exit 1; fi
 
-# Configured tools: alternatives only when used; failure falls back without persisting it.
+# Package installer helpers.
 . "$repo/scripts/tools.sh"
 
 # A partial download must never execute; installer failures must propagate and clean up.
@@ -292,20 +299,6 @@ printf 'exit 7\n' > "$work/download-script"
 expect_failure run_installer https://example.com/install.sh
 [ ! -e "$(cat "$work/download-path")" ]
 unset -f curl
-
-ensure_tool() { printf '%s\n' "$1" >> "$work/tools"; [ "$1" != "${FAIL_TOOL:-}" ]; }
-editor=ranger browser=elinks top=gtop debug=0
-install_configured
-printf 'ranger\nelinks\n' > "$work/expected"
-cmp "$work/expected" "$work/tools"
-: > "$work/tools"
-editor=vim browser=lynx top=gtop debug=1
-install_configured
-printf 'vim\nlynx\ngtop\n' > "$work/expected"
-cmp "$work/expected" "$work/tools"
-FAIL_TOOL=lynx
-install_configured
-[ "$browser" = elinks ]
 
 # Exercise the real selection/recording script with only external installation stubbed.
 mkdir "$work/installer"

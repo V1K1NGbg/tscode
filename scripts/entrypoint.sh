@@ -8,6 +8,8 @@ export TSCODE_CONFIG_DIR=${TSCODE_CONFIG_DIR:-/config}
 . "$lib_dir/tools.sh"
 # shellcheck source=workspace-user.sh
 . "$lib_dir/workspace-user.sh"
+# shellcheck source=layout.sh
+. "$lib_dir/layout.sh"
 
 mkdir -p "$config_dir"
 startup() {
@@ -23,18 +25,9 @@ startup() {
     if [ -d "$config_dir/.config-docker" ]; then
         cp -R "$config_dir/.config-docker/." "$HOME/"
     fi
-    debug=${debug:-0}
-    website=${website:-https://lite.duckduckgo.com/lite/}
-    editor=${editor:-ranger}
-    browser=${browser:-elinks}
-    top=${top:-htop}
-    validate debug "$debug"
-    validate website "$website"
-    validate editor "$editor"
-    validate browser "$browser"
-    validate top "$top"
+    panes=${panes-${defaults[0]#*=}}
+    validate panes "$panes"
     ensure_tool core
-    install_configured
     if [ -f "$config_dir/toolchains" ]; then
         # The container uses Bash: read one tool per line, ignoring empty lines.
         readarray -t saved < <(sed '/^$/d' "$config_dir/toolchains")
@@ -54,19 +47,7 @@ startup() {
         return
     fi
 
-    browser_args=("$browser")
-    [ "$browser" != carbonyl ] || browser_args+=(--no-sandbox)
-    browser_args+=("$website")
-    # tmux parses trailing semicolons even in separate arguments; quote the whole command.
-    printf -v browser_command '%q ' "${browser_args[@]}"
-    workspace_exec tmux -f "$HOME/.tmux.conf" new-session -d -s tscode -x 160 -y 48 "$editor"
-    workspace_exec tmux split-window -h -t tscode:0 "$browser_command"
-    workspace_exec tmux split-window -v -t tscode:0 /bin/bash
-    if [ "$debug" = 1 ]; then
-        workspace_exec tmux split-window -h -t tscode:0 "$top"
-        workspace_exec tmux split-window -v -t tscode:0 less /tscode/config/help.md
-    fi
-    workspace_exec tmux select-pane -t tscode:0.0
+    create_workspace "$panes"
     touch /run/tscode.ready
     printf 'Workspace ready.\n'
 }

@@ -16,7 +16,7 @@ if [ "$#" -eq 1 ] && [ "$1" = --show ]; then
     if [ -s "$config_dir/toolchains" ]; then cat "$config_dir/toolchains"; printf '\n'; else printf '(none)\n'; fi
     exit 0
 fi
-[ "$#" -eq 2 ] || { fail 'Usage: tscodeconf --show | <debug|website|editor|browser|top> <value>'; exit 1; }
+[ "$#" -eq 2 ] || { fail 'Usage: tscodeconf --show | panes <value>'; exit 1; }
 validate "$1" "$2"
 repair_config
 tmp=$(mktemp "$config_dir/config.XXXXXX")

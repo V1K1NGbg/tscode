@@ -25,8 +25,8 @@ trap cleanup EXIT
 # The image contains recipes, not application packages.
 docker run --rm --platform "$platform" --entrypoint bash "$image" -ec '
     test "$HOME" = /home/tscode
-    for tool in ranger elinks htop tmux git node npm javac rustc gcc; do
-        if command -v "$tool"; then echo "Unexpected bundled tool: $tool"; exit 1; fi
+    for tool in ranger opencode carbonyl tmux git node npm javac rustc gcc; do
+        if type -P "$tool"; then echo "Unexpected bundled tool: $tool"; exit 1; fi
     done
 '
 . "$repo/scripts/storage.sh"
@@ -35,9 +35,9 @@ prepare_storage "$image" "$prefix"
 mounts=("${storage_mounts[@]}" -v "$work:/config" -v "$repo/tests:/tests:ro")
 
 docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash -ec '
-    for tool in ranger file nano sensible-editor elinks tmux git; do command -v "$tool"; done
-    for tool in vim htop node npm javac rustc gcc; do
-        if command -v "$tool"; then echo "Unexpected optional tool: $tool"; exit 1; fi
+    for tool in ranger file nano sensible-editor opencode carbonyl tmux git node npm; do type -P "$tool"; done
+    for tool in javac rustc gcc; do
+        if type -P "$tool"; then echo "Unexpected optional tool: $tool"; exit 1; fi
     done
     printf "ranger opens text\n" > /tmp/"ranger test.txt"
     test "$(env -u VISUAL EDITOR=cat rifle -p editor /tmp/"ranger test.txt")" = "ranger opens text"
@@ -45,39 +45,25 @@ docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash -ec '
     printf "home survives\n" > "$HOME/.persistence-check"
 '
 
-# Real tmux startup in both modes. Capture a difficult URL in the debug browser pane.
-for debug in 0 1; do
-    website=about:blank
-    if [ "$debug" = 1 ]; then
-        cat > "$work/startup-docker.sh" <<'HOOK'
-cat > /usr/local/bin/elinks <<'BROWSER'
-#!/bin/bash
-printf '%s' "$1" > /config/browser-url
-exec sleep 60
-BROWSER
-chmod +x /usr/local/bin/elinks
-HOOK
-        # shellcheck disable=SC2016 # The browser must receive this literally.
-        website='https://example.com/?q=$(false)&name=a b;'
-    fi
-    container=$(docker run -dit --rm --platform "$platform" "${mounts[@]}" \
-        -e "debug=$debug" -e "website=$website" "$image")
+# Real startup with the default commands and an arbitrary command layout.
+docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash /tests/layout.sh /tscode
+for panes in 'ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' 'shell;0:right:50:printf "%s" "https://example.com/a:b" > /config/command-output && shell'; do
+    container=$(docker run -dit --rm --platform "$platform" "${mounts[@]}" -e "panes=$panes" "$image")
     ready=0
     for ((attempt=0; attempt<60; attempt++)); do
-        if docker exec "$container" tmux list-panes -t tscode:0 > "$work/panes" 2>/dev/null; then
-            count=$(wc -l < "$work/panes" | tr -d ' ')
-            expected=3
-            [ "$debug" = 0 ] || expected=5
-            if [ "$count" = "$expected" ]; then
-                if [ "$debug" = 0 ] || [ -f "$work/browser-url" ]; then ready=1; break; fi
-            fi
-        fi
+        if docker exec "$container" test -f /run/tscode.ready; then ready=1; break; fi
         sleep 1
     done
     if [ "$ready" != 1 ]; then docker logs "$container"; exit 1; fi
-    if [ "$debug" = 1 ]; then
-        [ "$(cat "$work/browser-url")" = "$website" ]
-        docker exec "$container" rm /usr/local/bin/elinks
+    expected=4
+    case "$panes" in shell*) expected=2 ;; esac
+    [ "$(docker exec "$container" tmux list-panes -t tscode:0 | wc -l | tr -d ' ')" = "$expected" ]
+    if [ "$expected" = 2 ]; then
+        for ((attempt=0; attempt<50; attempt++)); do
+            [ ! -s "$work/command-output" ] || break
+            sleep 0.1
+        done
+        [ "$(cat "$work/command-output")" = 'https://example.com/a:b' ]
     fi
     docker exec "$container" bash -c tscode-exit
     for ((attempt=0; attempt<60; attempt++)); do

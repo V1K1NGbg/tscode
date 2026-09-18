@@ -24,16 +24,7 @@ test "$(stat -c %u /config/toolchains)" = "$(stat -c %u /config)"
 cp /config/toolchains /tmp/selections
 tscode-install all
 cmp /tmp/selections /config/toolchains
-. /tscode/scripts/tools.sh
-for tool in nano vim links lynx carbonyl vtop gtop; do
-    ensure_tool "$tool"
-    command -v "$tool"
-done
+for tool in ranger opencode carbonyl; do command -v "$tool"; done
+opencode --version
+carbonyl --version
 bash -ic 'nvm current; node --version; npm --version'
-# npm monitors must start successfully under the installed Node version.
-for tool in vtop gtop; do
-    tmux new-session -d -s toolcheck "$tool"
-    sleep 2
-    tmux has-session -t toolcheck
-    tmux kill-session -t toolcheck
-done

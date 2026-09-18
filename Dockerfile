@@ -12,8 +12,7 @@ RUN sed -i '/^root:/s|:/root:|:/home/tscode:|' /etc/passwd \
     && chmod +x /tscode/scripts/entrypoint.sh /tscode/scripts/prepare-packages.sh /tscode/scripts/tscode-install \
     && ln -s /tscode/scripts/tscode-install /usr/local/bin/tscode-install
 
-ENV debug=0 website=https://lite.duckduckgo.com/lite/ editor=ranger browser=elinks top=htop \
-    TSCODE_CONFIG_DIR=/config BASH_ENV=/tscode/config/bash-env \
+ENV TSCODE_CONFIG_DIR=/config BASH_ENV=/tscode/config/bash-env \
     NVM_DIR=/packages/nvm CARGO_HOME=/packages/cargo RUSTUP_HOME=/packages/rustup \
     PATH=/packages/cargo/bin:$PATH LANG=C.UTF-8
 WORKDIR /home/tscode/project

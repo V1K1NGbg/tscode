@@ -11,7 +11,9 @@ Installed packages and your container home persist across launches.
 
 Inside the shell: tscode-detach keeps the workspace running; tscode-exit closes it.
 Keyboard detach: Ctrl+a, then d. Reattach from the host with: tscode resume
-Outside the container: tscodeconf editor vim (takes effect next launch).
+Outside the container: tscodeconf panes 'ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell'
+Each split is target-pane:direction:new-pane-percent:command; targets use declaration order from 0.
+Commands accept arguments; semicolons separate panes. Changes take effect next launch.
 Update installed packages from the host: tscode update
 
 Host diagnostics: tscode status; tscode logs

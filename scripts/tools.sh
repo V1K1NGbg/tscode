@@ -24,23 +24,5 @@ apt_packages() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
 }
 
-install_configured() {
-    if ! ensure_tool "$editor"; then
-        printf 'Could not install %s; using ranger for this session.\n' "$editor" >&2
-        editor=ranger
-        ensure_tool ranger || return
-    fi
-    if ! ensure_tool "$browser"; then
-        printf 'Could not install %s; using elinks for this session.\n' "$browser" >&2
-        browser=elinks
-        ensure_tool elinks || return
-    fi
-    if [ "${debug:-0}" = 1 ] && ! ensure_tool "$top"; then
-        printf 'Could not install %s; using htop for this session.\n' "$top" >&2
-        top=htop
-        ensure_tool htop || return
-    fi
-}
-
 # shellcheck source=../config/packages.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../config/packages.sh"

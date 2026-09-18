@@ -22,7 +22,7 @@ Open a new terminal, then:
 ```bash
 tscode                 # open the current directory
 tscode ~/my-project    # open another directory
-tscodeconf editor vim  # install/use Vim on the next launch
+tscodeconf panes shell # open only a shell on the next launch
 tscodeconf --show      # effective settings and saved toolchain selections
 tscode status         # state, project, image, and startup-log location
 tscode logs           # saved startup diagnostics, even after a failed launch
@@ -71,7 +71,7 @@ docker run -dit --rm --hostname tscode --name tscode \
 docker exec -it tscode tmux attach-session -t tscode
 ```
 
-Add flags such as `-e editor=vim` before the image name, or `--env-file "$HOME/.tscode/config.conf"` to use CLI configuration. One workspace runs at a time under the name `tscode`.
+Add flags such as `-e panes=shell` before the image name, or `--env-file "$HOME/.tscode/config.conf"` to use CLI configuration. One workspace runs at a time under the name `tscode`.
 
 ## Persistent home and packages
 
@@ -94,31 +94,42 @@ TS Code scripts and recipes live separately at `/tscode`, so updating the image 
 
 ## Tools and configuration
 
-The image contains the Ubuntu base and TS Code scripts, with no application installation during the build. First startup installs tmux, Git, curl, less, the selected editor, and the selected browser. The defaults are **ranger** and **elinks**; **htop** is installed when debug mode first uses it. Required dependencies are included—for example, ranger needs Python, `file` for file-type detection, and Nano with `sensible-editor` to open text files.
+The image contains Ubuntu and TS Code scripts. First startup installs a fixed workspace toolset: tmux, Git, curl, less, ranger (with its dependencies), OpenCode, and Carbonyl. Node LTS supplies npm for OpenCode and Carbonyl. Packages persist and are installed only when missing. Other commands must already be installed, for example through your startup hook or `sudo apt-get install` in the workspace.
 
-| Setting | Default | Choices |
-| --- | --- | --- |
-| `editor` | `ranger` | `ranger`, `nano`, `vim` |
-| `browser` | `elinks` | `elinks`, `links`, `lynx`, `carbonyl` |
-| `top` | `htop` | `htop`, `top`, `vtop`, `gtop` |
-| `debug` | `0` | `0`, `1` (adds monitor and help panes) |
-| `website` | `https://lite.duckduckgo.com/lite/` | A nonempty, single-line URL |
+The only workspace setting is `panes`. Its default is:
 
-```bash
-tscodeconf browser lynx
-tscodeconf website 'https://example.com/?a=1&b=2'
-tscodeconf debug 1
+```ini
+panes=ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell
 ```
 
-Settings live in `~/.tscode/config.conf` as plain `key=value` lines, without shell quoting. Missing keys receive defaults. Invalid settings are reported instead of executed.
+```text
+┌─────────────┬─────────────┬─────────────┐
+│             │ opencode    │             │
+│ ranger      ├─────────────┤ carbonyl    │
+│             │ shell       │             │
+└─────────────┴─────────────┴─────────────┘
+```
 
-Only missing selected tools are installed. An optional monitor is installed only with `debug=1`. npm-based tools install Node LTS through nvm as a dependency. If an optional tool fails, TS Code tries the default for that session without changing your saved choice. First-time installation requires networking; an already installed fallback works offline. Carbonyl continues to run with `--no-sandbox` for compatibility with the container environment.
-
-Google Search may show an “update your browser” page in ELinks ([Google’s browser requirements](https://support.google.com/websearch/answer/16515119?hl=en)). The default is DuckDuckGo Lite, which works in the text browser. Existing website settings are preserved; switch with:
+Settings live in `~/.tscode/config.conf` as plain `key=value` lines. Do not quote the whole value in the file. To change it from your terminal:
 
 ```bash
-tscodeconf website https://lite.duckduckgo.com/lite/
+tscodeconf panes 'ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell'
+tscodeconf panes 'shell;0:right:50:carbonyl https://example.com'
+tscodeconf --show
 ```
+
+The first command fills the window. Each subsequent `target:direction:percent:command` splits an earlier pane:
+
+- `target` is its zero-based declaration number, even if tmux later renumbers visible panes.
+- `direction` is `left`, `right`, `top`, or `bottom`, locating the new pane relative to the target.
+- `percent` is the new pane's share of the target's current width or height (`1`–`99`). The default leaves approximately one third for ranger, then divides the remainder into two columns; cell rounding and borders affect exact sizes.
+- `command` is a Bash command, including arguments, quotes, environment variables, pipes, or redirection. Colons within commands and URLs are preserved. Semicolons always separate panes, including inside quotes; put commands needing semicolons in a script and use its path instead.
+
+Commands run inside the container as the workspace user. Config is executable, trusted input: command substitution and other shell expressions execute when the pane opens, never when saving or displaying settings. `shell` opens interactive Bash. The Bash environment wraps `carbonyl` with `--no-sandbox` for container compatibility. There are no app aliases, automatic debug panes, app detection, or fallback applications. OpenCode is installed using its [official npm package](https://github.com/anomalyco/opencode#installation); configure its provider credentials inside the workspace.
+
+Changes take effect on a fresh workspace launch; `tscode resume` keeps existing panes. The initial window is 160×48 cells and adapts to your terminal when attached. Splits too small to fit fail with details in `tscode logs`; command errors appear in the pane while it remains open.
+
+On upgrade, the installer or next launch removes old app, debug, website, and preset/size settings, keeping a backup at `~/.tscode/config.conf.before-commands`. Missing `panes` or the old `panes=default` receives the new default. Existing custom pane strings are preserved; replace former `editor`, `browser`, `debug`, and `help` aliases with actual commands.
 
 ### Language toolchains
 
@@ -137,7 +148,8 @@ tscode-install all             # all six toolchains
 
 - **Node:** `nvm install --lts` on first installation, then reuse the installed LTS version. It is no longer pinned to Node 22.
 - **Java:** Ubuntu's OpenJDK 25 LTS package.
-- **Python, Lua, C/C++, editors, browsers, monitors:** Ubuntu 26.04 LTS packages, or upstream stable npm packages where required.
+- **Python, Lua, C/C++, ranger:** Ubuntu 26.04 LTS packages.
+- **OpenCode and Carbonyl:** upstream npm packages.
 - **Rust:** the upstream stable channel. Rust and several other tools do not offer a separate LTS channel; they are not mislabeled as LTS.
 
 Successful explicit toolchain selections are saved in `~/.tscode/toolchains`, one name per line. Startup checks these selections and installs only missing components. Removing a name stops the startup check but does not uninstall an already persisted toolchain. Installations made manually with apt, npm, nvm, or rustup also survive when they use the normal paths described above.
@@ -150,7 +162,7 @@ For Python dependencies, use a virtual environment: `python3 -m venv .venv`.
 - Put trusted shell commands in `~/.tscode/startup-docker.sh`; it is sourced as root after tool installation, before opening the workspace.
 - If supplying your own `.bashrc`, source `/tscode/config/bash-env` to enable nvm and interactive toolchain environment refresh.
 
-These files are preserved by installer updates. The installer validates TS Code marker pairs in every targeted shell profile before editing any profile; malformed markers must be corrected manually. Existing installations keep their tool choices, including `vtop`; set `top=htop` to use the default monitor.
+These files are preserved by installer updates. The installer validates TS Code marker pairs in every targeted shell profile before editing any profile; malformed markers must be corrected manually. Existing custom pane commands are preserved.
 
 ## Navigation
 
@@ -194,6 +206,7 @@ To uninstall, remove `~/.local/bin/tscode` and `~/.local/bin/tscodeconf`, then r
 
 ```bash
 bash tests/check.sh
+bash tests/layout.sh # requires tmux
 shellcheck -x -P SCRIPTDIR --shell=bash -e SC1090,SC1091 install.sh scripts/* config/bash-env config/packages.sh tests/*.sh
 docker build -t tscode:test .
 bash tests/smoke.sh tscode:test linux/arm64  # use linux/amd64 on x86-64
