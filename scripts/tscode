@@ -1,0 +1,153 @@
+#!/bin/bash
+set -euo pipefail
+# shellcheck source=storage.sh
+. "${TSCODE_HOME:-$HOME}/.tscode/scripts/storage.sh"
+# shellcheck source=config.sh
+. "${TSCODE_HOME:-$HOME}/.tscode/scripts/config.sh"
+
+startup_log="$config_dir/startup.log"
+inspect() { docker inspect --format "$1" tscode; }
+load_workspace() {
+    state=$(inspect '{{.State.Status}}' 2>/dev/null) || { state='not running'; return 0; }
+    mounted_project=$(inspect '{{range .Mounts}}{{if eq .Destination "/home/tscode/project"}}{{.Source}}{{end}}{{end}}')
+    mounted_config=$(inspect '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Source}}{{end}}{{end}}')
+    managed=$(inspect '{{index .Config.Labels "org.tscode.workspace"}}')
+    if [ "$managed" != 1 ]; then
+        [ "$(inspect '{{join .Config.Entrypoint " "}}')" = /tscode/scripts/entrypoint.sh ] &&
+            [ -n "$mounted_project" ] && [ -n "$mounted_config" ] || {
+            fail 'An unrelated container is named tscode; refusing to use it.'; return 1;
+        }
+    fi
+    [ -z "$mounted_config" ] || startup_log="$mounted_config/startup.log"
+}
+
+workspace_tmux() {
+    docker exec -e BASH_ENV=/dev/null tscode bash -c '
+        if [ -f /tscode/scripts/workspace-user.sh ]; then
+            exec bash /tscode/scripts/workspace-user.sh tmux "$@"
+        fi
+        exec tmux "$@"
+    ' bash "$@"
+}
+
+workspace_ready() {
+    if docker exec -e BASH_ENV=/dev/null tscode test -f /tscode/scripts/workspace-user.sh >/dev/null 2>&1; then
+        docker exec -e BASH_ENV=/dev/null tscode test -f /run/tscode.ready >/dev/null 2>&1 || return
+    fi
+    workspace_tmux has-session -t tscode >/dev/null 2>&1
+}
+
+stop_follower() {
+    if [ -n "${follower:-}" ]; then
+        kill "$follower" 2>/dev/null || true
+        wait "$follower" 2>/dev/null || true
+        follower=''
+    fi
+}
+
+attach_workspace() {
+    [ "$state" = running ] || { fail "Workspace is $state. Start it with: tscode [directory]"; return 1; }
+    if ! workspace_ready; then
+        printf 'Waiting for startup; saved diagnostics: %s\n' "$startup_log"
+        if [ -f "$startup_log" ]; then
+            tail -n +1 -f "$startup_log" &
+            follower=$!
+        else
+            docker logs -f tscode &
+            follower=$!
+        fi
+        trap stop_follower EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        until workspace_ready; do
+            if [ "$(inspect '{{.State.Running}}' 2>/dev/null || true)" != true ]; then
+                stop_follower
+                [ ! -f "$startup_log" ] || cat "$startup_log" >&2
+                fail "Startup failed. Saved diagnostics: $startup_log"
+                return 1
+            fi
+            sleep 1
+        done
+        stop_follower
+        trap - EXIT INT TERM
+    fi
+    exec docker exec -it -e BASH_ENV=/dev/null tscode bash -c '
+        if [ -f /tscode/scripts/workspace-user.sh ]; then
+            exec bash /tscode/scripts/workspace-user.sh tmux attach-session -t tscode
+        fi
+        exec tmux attach-session -t tscode
+    '
+}
+
+usage='Usage: tscode [directory|resume|update|status|logs]'
+[ "$#" -le 1 ] || { fail "$usage"; exit 1; }
+case "${1:-}" in
+    --help) printf '%s\n' "$usage"; exit 0 ;;
+    logs)
+        [ -f "$startup_log" ] || { fail "No startup log at $startup_log"; exit 1; }
+        cat "$startup_log"
+        exit 0
+        ;;
+esac
+docker info >/dev/null 2>&1 || { fail 'Start Docker and ensure your user can access its daemon.'; exit 1; }
+load_workspace
+identity=(-e TSCODE_UID=0 -e TSCODE_GID=0)
+if [ "$(uname -s)" = Linux ]; then
+    identity=(-e "TSCODE_UID=$(id -u)" -e "TSCODE_GID=$(id -g)")
+fi
+case "${1:-}" in
+    status)
+        display_state=$state
+        if [ "$state" = running ]; then
+            display_state=starting
+            if workspace_ready; then display_state=ready; fi
+        elif [ "$state" != 'not running' ]; then
+            display_state=stopped
+        fi
+        printf 'Workspace: %s\n' "$display_state"
+        if [ "$state" != 'not running' ]; then
+            printf 'Project: %s\nImage: %s\n' "$mounted_project" "$(inspect '{{.Config.Image}}')"
+        fi
+        printf 'Startup log: %s\n' "$startup_log"
+        exit 0
+        ;;
+    resume) attach_workspace ;;
+    update)
+        updater="${TSCODE_HOME:-$HOME}/.tscode/scripts/update-packages.sh"
+        if [ "$state" = running ]; then
+            exec docker exec -u 0 -i tscode bash -s < "$updater"
+        fi
+        prepare_image "${TSCODE_HOME:-$HOME}/.tscode"
+        prepare_storage "$image"
+        exec docker run --rm -i "${identity[@]}" "${storage_mounts[@]}" \
+            --entrypoint bash "$image" -s < "$updater"
+        ;;
+esac
+[ -d "${1:-.}" ] || { fail "Directory does not exist: ${1:-.}"; exit 1; }
+project=$(cd -- "${1:-.}" && pwd -P)
+if [ "$state" = running ]; then
+    if [ "$mounted_project" = "$project" ]; then attach_workspace; fi
+    fail "Another project is running: $mounted_project. Use tscode resume, then tscode-exit inside it before switching projects."
+    exit 1
+elif [ "$state" != 'not running' ]; then
+    fail 'A stopped container named tscode already exists. Inspect and remove it manually before starting a new workspace.'
+    exit 1
+fi
+repair_config
+check_config
+prepare_image "${TSCODE_HOME:-$HOME}/.tscode"
+prepare_storage "$image"
+# The container can write the log without changing its host ownership.
+(umask 077; : > "$startup_log")
+chmod 600 "$startup_log"
+docker run -dit --hostname tscode --name tscode --rm \
+    --label org.tscode.workspace=1 "${identity[@]}" "${storage_mounts[@]}" \
+    -v "$project:/home/tscode/project" -v "$config_dir:/config" \
+    --env-file "$config_dir/config.conf" "$image" >/dev/null
+load_workspace
+if [ "$state" != running ]; then
+    [ ! -f "$startup_log" ] || cat "$startup_log" >&2
+    fail "Startup failed. Saved diagnostics: $startup_log"
+    exit 1
+fi
+attach_workspace

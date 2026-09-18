@@ -1,0 +1,58 @@
+#!/bin/bash
+set -eo pipefail
+script=${BASH_SOURCE[0]}
+[ ! -L "$script" ] || script=$(readlink "$script")
+# shellcheck source=tools.sh
+. "$(dirname "$script")/tools.sh"
+
+if [ "$#" -eq 0 ] || [ "${1:-}" = --help ]; then
+    echo 'Usage: tscode-install python|node|java|lua|rust|cpp|all [...]'
+    exit 0
+fi
+# Validate the whole request before making changes.
+for tool in "$@"; do
+    case "$tool" in python|node|java|lua|rust|cpp|all) ;; *) echo "Unknown toolchain: $tool" >&2; exit 1 ;; esac
+done
+for tool in "$@"; do
+    if [ "$tool" = all ]; then
+        set -- python node java lua rust cpp
+        break
+    fi
+done
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo env BASH_ENV=/dev/null HOME=/home/tscode \
+        TSCODE_UID="${TSCODE_UID:-$(id -u)}" TSCODE_GID="${TSCODE_GID:-$(id -g)}" \
+        TSCODE_CONFIG_DIR="${TSCODE_CONFIG_DIR:-/config}" \
+        NVM_DIR=/packages/nvm CARGO_HOME=/packages/cargo RUSTUP_HOME=/packages/rustup \
+        PATH="/packages/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        bash "$script" "$@"
+fi
+# shellcheck source=workspace-user.sh
+. "$(dirname "$script")/workspace-user.sh"
+validate_workspace_user
+config_dir=${TSCODE_CONFIG_DIR:-/config}
+mkdir -p "$config_dir"
+status=0
+for tool in "$@"; do
+    if ! ensure_tool "$tool"; then
+        printf 'Failed to install %s; retry with: tscode-install %s\n' "$tool" "$tool" >&2
+        own_toolchains
+        status=1
+        continue
+    fi
+    own_toolchains
+    if grep -qxF "$tool" "$config_dir/toolchains" 2>/dev/null; then
+        continue
+    fi
+
+    record=$(mktemp "$config_dir/toolchains.XXXXXX")
+    trap 'rm -f "$record"' EXIT
+    if [ -f "$config_dir/toolchains" ]; then
+        awk '{print}' "$config_dir/toolchains" > "$record"
+    fi
+    printf '%s\n' "$tool" >> "$record"
+    # Keep the saved selection editable by the host user on Linux bind mounts.
+    chown --reference="$config_dir" "$record"
+    mv "$record" "$config_dir/toolchains"
+done
+exit "$status"

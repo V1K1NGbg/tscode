@@ -1,0 +1,27 @@
+#!/bin/bash
+set -euo pipefail
+# shellcheck source=config.sh
+. "${TSCODE_HOME:-$HOME}/.tscode/scripts/config.sh"
+
+if [ "$#" -eq 1 ] && [ "$1" = --show ]; then
+    check_config
+    for setting in "${defaults[@]}"; do
+        value=''
+        if [ -f "$config_dir/config.conf" ]; then
+            value=$(grep "^${setting%%=*}=" "$config_dir/config.conf" || true)
+        fi
+        printf '%s\n' "${value:-$setting}"
+    done
+    printf '\nSaved toolchain selections (not verified installations):\n'
+    if [ -s "$config_dir/toolchains" ]; then cat "$config_dir/toolchains"; printf '\n'; else printf '(none)\n'; fi
+    exit 0
+fi
+[ "$#" -eq 2 ] || { fail 'Usage: tscodeconf --show | <debug|website|editor|browser|top> <value>'; exit 1; }
+validate "$1" "$2"
+repair_config
+tmp=$(mktemp "$config_dir/config.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+awk -v key="$1" 'index($0, key "=") != 1 {print}' "$config_dir/config.conf" > "$tmp"
+printf '%s=%s\n' "$1" "$2" >> "$tmp"
+mv "$tmp" "$config_dir/config.conf"
+printf '%s=%s\n' "$1" "$2"
