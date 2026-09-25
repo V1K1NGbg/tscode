@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # shellcheck source=config.sh
-. "${TSCODE_HOME:-$HOME}/.tscode/scripts/config.sh"
+. "${TSCODE_HOME:-$HOME}/.tscode/app/scripts/config.sh"
 
 if [ "$#" -eq 1 ] && [ "$1" = --show ]; then
     check_config
@@ -16,7 +16,7 @@ if [ "$#" -eq 1 ] && [ "$1" = --show ]; then
     if [ -s "$config_dir/toolchains" ]; then cat "$config_dir/toolchains"; printf '\n'; else printf '(none)\n'; fi
     exit 0
 fi
-[ "$#" -eq 2 ] || { fail 'Usage: tscodeconf --show | panes <value>'; exit 1; }
+[ "$#" -eq 2 ] || { fail 'Usage: tscodeconf --show | panes <value> | website <URL>'; exit 1; }
 validate "$1" "$2"
 repair_config
 tmp=$(mktemp "$config_dir/config.XXXXXX")

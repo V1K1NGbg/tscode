@@ -24,10 +24,11 @@ ensure_tool() {
     case "$1" in
         core)
             apt_packages tmux less git curl ca-certificates ranger file nano sensible-utils \
-                libnss3 libexpat1 libasound2t64 libfontconfig1 || return
+                libssl3t64 libssh2-1t64 libbrotli1 || return
             ensure_node || return
             type -P opencode >/dev/null || npm install --global opencode-ai || return
-            type -P carbonyl >/dev/null || npm install --global carbonyl || return
+            # Remove the browser installed by older TS Code versions.
+            if [ -d "$(npm root --global)/carbonyl" ]; then npm uninstall --global carbonyl || return; fi
             ;;
         python) apt_packages python3 python3-pip python3-venv ;;
         java) apt_packages openjdk-25-jdk ;;

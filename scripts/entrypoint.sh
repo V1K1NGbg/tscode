@@ -25,6 +25,10 @@ startup() {
     if [ -d "$config_dir/.config-docker" ]; then
         cp -R "$config_dir/.config-docker/." "$HOME/"
     fi
+    if [ ! -e "$HOME/.config/chawan/config.toml" ] && [ ! -e "$HOME/.chawan/config.toml" ]; then
+        mkdir -p "$HOME/.config/chawan"
+        cp /tscode/config/chawan.toml "$HOME/.config/chawan/config.toml"
+    fi
     panes=${panes-${defaults[0]#*=}}
     validate panes "$panes"
     ensure_tool core

@@ -24,7 +24,7 @@ test "$(stat -c %u /config/toolchains)" = "$(stat -c %u /config)"
 cp /config/toolchains /tmp/selections
 tscode-install all
 cmp /tmp/selections /config/toolchains
-for tool in ranger opencode carbonyl; do command -v "$tool"; done
+for tool in ranger opencode cha; do command -v "$tool"; done
 opencode --version
-carbonyl --version
+cha --version
 bash -ic 'nvm current; node --version; npm --version'

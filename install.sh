@@ -18,30 +18,39 @@ fi
 command -v docker >/dev/null || { echo 'Install Docker first: https://docs.docker.com/get-started/get-docker/' >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo 'Start Docker and ensure your user can access its daemon, then retry.' >&2; exit 1; }
 user_dir=${TSCODE_HOME:-$HOME}
-install_dir="$user_dir/.tscode"
+install_dir="$user_dir/.tscode/app"
 bin_dir="$user_dir/.local/bin"
-mkdir -p "$install_dir/scripts" "$install_dir/config" "$bin_dir"
+mkdir -p "$install_dir" "$bin_dir"
 for name in tscode tscodeconf; do
     if [ -e "$bin_dir/$name" ] && [ ! -L "$bin_dir/$name" ]; then
         echo "Refusing to replace an existing file: $bin_dir/$name" >&2
         exit 1
     fi
-    if [ -L "$bin_dir/$name" ] && [ "$(readlink "$bin_dir/$name")" != "$install_dir/scripts/$name" ]; then
+    if [ -L "$bin_dir/$name" ] && [ "$(readlink "$bin_dir/$name")" != "$install_dir/scripts/$name" ] &&
+        [ "$(readlink "$bin_dir/$name")" != "$user_dir/.tscode/scripts/$name" ]; then
         echo "Refusing to replace an unrelated command link: $bin_dir/$name" >&2
         exit 1
     fi
 done
+# Move the former managed files together, keeping user settings in .tscode.
+for name in scripts config Dockerfile .dockerignore; do
+    if [ -e "$user_dir/.tscode/$name" ] && [ ! -e "$install_dir/$name" ]; then
+        mv "$user_dir/.tscode/$name" "$install_dir/$name"
+    fi
+done
+mkdir -p "$install_dir/scripts" "$install_dir/config"
 cp "$source_dir"/scripts/* "$install_dir/scripts/"
 cp "$source_dir"/config/* "$install_dir/config/"
 cp "$source_dir/Dockerfile" "$source_dir/.dockerignore" "$install_dir/"
 . "$install_dir/scripts/storage.sh"
-prepare_image "$install_dir"
 chmod +x "$install_dir/scripts/tscode" "$install_dir/scripts/tscodeconf"
 for name in tscode tscodeconf; do
     ln -sfn "$install_dir/scripts/$name" "$bin_dir/$name"
 done
 . "$install_dir/scripts/config.sh"
 repair_config
+[ -e "$config_dir/README.md" ] || cp "$source_dir/config/host-help.md" "$config_dir/README.md"
+prepare_image "$install_dir"
 
 # Bash login shells (including macOS Terminal) read the first existing login profile.
 bash_profile="$user_dir/.bash_profile"
@@ -81,4 +90,4 @@ for rc in "${profiles[@]}"; do
     cat "$tmp" > "$rc"
     rm -f "$tmp"
 done
-printf '\nInstalled. Open a new terminal and run: tscode\nOr run now: %q\n' "$bin_dir/tscode"
+printf 'Installed. Run: %q\n' "$bin_dir/tscode"

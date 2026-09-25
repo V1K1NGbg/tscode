@@ -1,13 +1,19 @@
 #!/bin/bash
 
+# Keep Docker Desktop's promotional hints out of TS Code commands.
+export DOCKER_CLI_HINTS=false
+
 # Build the installed source by default; an image override opts into prebuilt images.
 prepare_image() {
     local context=$1
     image=${TSCODE_IMAGE:-tscode:local}
     if [ -n "${TSCODE_IMAGE:-}" ]; then
-        docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image"
+        if ! docker image inspect "$image" >/dev/null 2>&1; then
+            printf 'Downloading workspace image...\n'
+            docker pull --quiet "$image" >/dev/null
+        fi
     else
-        docker build --pull=false -t "$image" "$context"
+        docker build --quiet --pull=false -t "$image" "$context" >/dev/null
     fi
 }
 

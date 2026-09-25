@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 # shellcheck source=storage.sh
-. "${TSCODE_HOME:-$HOME}/.tscode/scripts/storage.sh"
+. "${TSCODE_HOME:-$HOME}/.tscode/app/scripts/storage.sh"
 # shellcheck source=config.sh
-. "${TSCODE_HOME:-$HOME}/.tscode/scripts/config.sh"
+. "${TSCODE_HOME:-$HOME}/.tscode/app/scripts/config.sh"
 
 startup_log="$config_dir/startup.log"
 inspect() { docker inspect --format "$1" tscode; }
@@ -37,45 +37,35 @@ workspace_ready() {
     workspace_tmux has-session -t tscode >/dev/null 2>&1
 }
 
-stop_follower() {
-    if [ -n "${follower:-}" ]; then
-        kill "$follower" 2>/dev/null || true
-        wait "$follower" 2>/dev/null || true
-        follower=''
-    fi
-}
-
 attach_workspace() {
     [ "$state" = running ] || { fail "Workspace is $state. Start it with: tscode [directory]"; return 1; }
     if ! workspace_ready; then
-        printf 'Waiting for startup; saved diagnostics: %s\n' "$startup_log"
-        if [ -f "$startup_log" ]; then
-            tail -n +1 -f "$startup_log" &
-            follower=$!
-        else
-            docker logs -f tscode &
-            follower=$!
-        fi
-        trap stop_follower EXIT
+        printf 'Starting workspace...\n'
         trap 'exit 130' INT
         trap 'exit 143' TERM
         until workspace_ready; do
             if [ "$(inspect '{{.State.Running}}' 2>/dev/null || true)" != true ]; then
-                stop_follower
-                [ ! -f "$startup_log" ] || cat "$startup_log" >&2
+                if [ -f "$startup_log" ]; then
+                    cat "$startup_log" >&2
+                else
+                    docker logs tscode >&2 || true
+                fi
                 fail "Startup failed. Saved diagnostics: $startup_log"
                 return 1
             fi
             sleep 1
         done
-        stop_follower
-        trap - EXIT INT TERM
+        trap - INT TERM
     fi
     exec docker exec -it -e BASH_ENV=/dev/null tscode bash -c '
-        if [ -f /tscode/scripts/workspace-user.sh ]; then
-            exec bash /tscode/scripts/workspace-user.sh tmux attach-session -t tscode
-        fi
-        exec tmux attach-session -t tscode
+        set -o pipefail
+        # tmux draws directly to the terminal; stdout carries its exit notice.
+        {
+            if [ -f /tscode/scripts/workspace-user.sh ]; then
+                exec bash /tscode/scripts/workspace-user.sh tmux attach-session -t tscode
+            fi
+            exec tmux attach-session -t tscode
+        } | sed -e "/^[[]detached (from session tscode)[]]$/d" -e "/^[[]exited[]]$/d"
     '
 }
 
@@ -113,11 +103,11 @@ case "${1:-}" in
         ;;
     resume) attach_workspace ;;
     update)
-        updater="${TSCODE_HOME:-$HOME}/.tscode/scripts/update-packages.sh"
+        updater="${TSCODE_HOME:-$HOME}/.tscode/app/scripts/update-packages.sh"
         if [ "$state" = running ]; then
             exec docker exec -u 0 -i tscode bash -s < "$updater"
         fi
-        prepare_image "${TSCODE_HOME:-$HOME}/.tscode"
+        prepare_image "${TSCODE_HOME:-$HOME}/.tscode/app"
         prepare_storage "$image"
         exec docker run --rm -i "${identity[@]}" "${storage_mounts[@]}" \
             --entrypoint bash "$image" -s < "$updater"
@@ -135,7 +125,7 @@ elif [ "$state" != 'not running' ]; then
 fi
 repair_config
 check_config
-prepare_image "${TSCODE_HOME:-$HOME}/.tscode"
+prepare_image "${TSCODE_HOME:-$HOME}/.tscode/app"
 prepare_storage "$image"
 # The container can write the log without changing its host ownership.
 (umask 077; : > "$startup_log")

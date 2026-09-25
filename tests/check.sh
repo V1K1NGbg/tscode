@@ -18,6 +18,9 @@ mkdir -p "$work/bin" "$TSCODE_CONFIG_DIR/.config-docker" "$work/project space"
 cat > "$work/bin/docker" <<'STUB'
 #!/bin/bash
 printf '<%s>\n' "$@" >> "$TEST_LOG"
+if [ "${1:-}" != info ] && [ "${DOCKER_CLI_HINTS:-}" != false ]; then
+    echo 'Expected Docker hints to be disabled' >&2; exit 1
+fi
 [ "${DOCKER_STATUS:-0}" = 0 ] || exit "$DOCKER_STATUS"
 if [ "${1:-}" = inspect ]; then
     if [ "${CONTAINER_RUNNING:-false}" != true ] && [ ! -f "$TEST_LOG.running" ] && [ "${CONTAINER_STOPPED:-0}" != 1 ]; then exit 1; fi
@@ -37,25 +40,51 @@ if [ "${1:-}" = run ]; then
 fi
 if [ "${1:-}" = exec ]; then
     case " $* " in
-        *' -it '*) rm -f "$TEST_LOG.running" ;;
+        *' -it '*) rm -f "$TEST_LOG.running"; exec bash -c "${@: -1}" ;;
         *' test -f /tscode/scripts/workspace-user.sh '*) exit "${LEGACY:-0}" ;;
         *' test -f /run/tscode.ready '*) exit "${NOT_READY:-0}" ;;
     esac
 fi
 if [ "${1:-}" = image ] && [ "${IMAGE_MISSING:-0}" = 1 ]; then exit 1; fi
+if [ "${1:-}" = build ] || [ "${1:-}" = pull ]; then
+    case " $* " in *' --quiet '*) ;; *) echo 'Expected quiet image preparation' >&2; exit 1 ;; esac
+    echo 'image id or pull summary'
+    if [ "${IMAGE_FAILED:-0}" = 1 ]; then echo 'image preparation failed' >&2; exit 1; fi
+fi
 if [ "${3:-}" = --format ]; then echo ubuntu26.04-v1-arm64; fi
 exit 0
 STUB
 chmod +x "$work/bin/docker"
+cat > "$work/bin/tmux" <<'STUB'
+#!/bin/bash
+printf '%s\n' "${ATTACH_MESSAGE:-[detached (from session tscode)]}"
+[ -z "${ATTACH_ERROR:-}" ] || printf '%s\n' "$ATTACH_ERROR" >&2
+exit "${ATTACH_STATUS:-0}"
+STUB
+chmod +x "$work/bin/tmux"
 export PATH="$work/bin:$PATH"
-printf 'editor=vim\ndebug=1\npanes=default' > "$TSCODE_CONFIG_DIR/config.conf"
+printf 'editor=vim\ndebug=1\nwebsite=https://example.com/start\npanes=default' > "$TSCODE_CONFIG_DIR/config.conf"
 printf 'custom hook\n' > "$TSCODE_CONFIG_DIR/startup-docker.sh"
 printf 'custom overlay\n' > "$TSCODE_CONFIG_DIR/.config-docker/.bashrc"
 printf '# existing login profile\n' > "$TSCODE_HOME/.profile"
 printf 'alias tscode="~/.tscode/tscode.sh"\nalias keep="echo keep"\n' > "$TSCODE_HOME/.bashrc"
+# Upgrade the former installation layout and command symlinks.
+mkdir -p "$TSCODE_HOME/.local/bin" "$TSCODE_CONFIG_DIR/scripts" "$TSCODE_CONFIG_DIR/config"
+printf 'keep local file\n' > "$TSCODE_CONFIG_DIR/config/custom-file"
+cp "$repo/Dockerfile" "$repo/.dockerignore" "$TSCODE_CONFIG_DIR/"
+for name in tscode tscodeconf; do
+    cp "$repo/scripts/$name" "$TSCODE_CONFIG_DIR/scripts/"
+    ln -s "$TSCODE_CONFIG_DIR/scripts/$name" "$TSCODE_HOME/.local/bin/$name"
+done
 
 bash "$repo/install.sh"
 bash "$repo/install.sh"
+for name in scripts config Dockerfile .dockerignore; do
+    [ ! -e "$TSCODE_CONFIG_DIR/$name" ]
+    [ -e "$TSCODE_CONFIG_DIR/app/$name" ]
+done
+grep -qx 'keep local file' "$TSCODE_CONFIG_DIR/app/config/custom-file"
+[ -f "$TSCODE_CONFIG_DIR/README.md" ]
 [ "$(grep -c '^# >>> TS Code >>>' "$TSCODE_HOME/.bashrc")" = 1 ]
 [ "$(grep -c '^# >>> TS Code >>>' "$TSCODE_HOME/.zshrc")" = 1 ]
 [ "$(grep -c '^# >>> TS Code >>>' "$TSCODE_HOME/.profile")" = 1 ]
@@ -66,8 +95,10 @@ grep -q '^alias keep=' "$TSCODE_HOME/.bashrc"
 grep -qx 'custom hook' "$TSCODE_CONFIG_DIR/startup-docker.sh"
 grep -qx 'custom overlay' "$TSCODE_CONFIG_DIR/.config-docker/.bashrc"
 grep -qx 'editor=vim' "$TSCODE_CONFIG_DIR/config.conf.before-commands"
-grep -qx 'panes=ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' "$TSCODE_CONFIG_DIR/config.conf"
-[ "$(grep -c '=' "$TSCODE_CONFIG_DIR/config.conf")" = 1 ]
+# shellcheck disable=SC2016 # Saved commands retain the variable reference.
+grep -qxF 'panes=ranger;0:right:67:opencode;1:right:50:cha "${website:-https://www.google.com}";1:bottom:50:bash -i' "$TSCODE_CONFIG_DIR/config.conf"
+grep -qx 'website=https://example.com/start' "$TSCODE_CONFIG_DIR/config.conf"
+[ "$(grep -c '=' "$TSCODE_CONFIG_DIR/config.conf")" = 2 ]
 bash -c '. "$TSCODE_HOME/.bashrc"; command -v tscode' | grep -F "$TSCODE_HOME/.local/bin/tscode"
 if command -v zsh >/dev/null; then
     zsh -c '. "$ZDOTDIR/.zshrc"; command -v tscode' | grep -F "$TSCODE_HOME/.local/bin/tscode"
@@ -75,18 +106,37 @@ fi
 
 cli="$TSCODE_HOME/.local/bin/tscode"
 conf="$TSCODE_HOME/.local/bin/tscodeconf"
+# Existing helper-only panes migrate once to explicit commands; custom arguments stay literal.
+"$conf" panes 'shell;0:right:50:carbonyl;0:bottom:50:carbonyl --version;1:bottom:50:carbonyl --no-sandbox "https://example.com/a?x=1&y=2"'
+"$conf" website https://example.com/start
+# shellcheck disable=SC2016 # Saved commands must retain the variable reference.
+grep -qxF 'panes=bash -i;0:right:50:cha "${website:-https://www.google.com}";0:bottom:50:cha --version;1:bottom:50:cha "https://example.com/a?x=1&y=2"' "$TSCODE_CONFIG_DIR/config.conf"
+cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
+"$conf" website https://example.com/start
+cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 # Commands are saved literally, never executed by config validation or host startup.
-"$conf" panes "touch '$work/should-not-run';0:right:50:printf '%s' 'https://example.com/a:b' && shell"
+"$conf" panes "touch '$work/should-not-run';0:right:50:printf '%s' 'https://example.com/a:b' && bash -i"
 [ ! -e "$work/should-not-run" ]
 cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
 for value in '' ' ' ';shell' 'shell;' 'shell;;bash' 'shell;1:right:50:bash' 'shell;0:up:50:bash' 'shell;0:right:0:bash' 'shell;0:right:100:bash' 'shell;00:right:50:bash' 'shell;99999999999999999999:right:50:bash' 'shell;0:right:50: '; do
     expect_failure "$conf" panes "$value"
 done
-for key in editor browser top debug website layout editor_width shell_height top_width help_height; do
+for key in editor browser top debug layout editor_width shell_height top_width help_height; do
     expect_failure "$conf" "$key" ignored
 done
 expect_failure "$conf" panes $'shell\npanes=bash'
 cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
+for value in '' 'example.com' 'file:///etc/passwd' 'https://example.com/has space' $'https://example.com\nother=value'; do
+    expect_failure "$conf" website "$value"
+done
+cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
+"$conf" website 'https://example.com/a?x=1&y=2'
+"$conf" --show | grep -Fx 'website=https://example.com/a?x=1&y=2'
+# Restore a homepage removed by an earlier app-to-command migration.
+sed '/^website=/d' "$TSCODE_CONFIG_DIR/config.conf" > "$work/without-website"
+cp "$work/without-website" "$TSCODE_CONFIG_DIR/config.conf"
+"$conf" panes 'bash -i'
+grep -qx 'website=https://example.com/start' "$TSCODE_CONFIG_DIR/config.conf"
 "$cli" "$work/project space"
 grep -Fx "<$work/project space:/home/tscode/project>" "$TEST_LOG"
 grep -Fx "<$TSCODE_CONFIG_DIR:/config>" "$TEST_LOG"
@@ -101,21 +151,23 @@ cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$cli" "$work/missing"
 printf 'panes=bash\n' >> "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$cli" "$work/project space"
-"$conf" panes shell
+"$conf" panes 'bash -i'
 "$cli" "$work/project space"
 DOCKER_STATUS=1 expect_failure bash "$repo/install.sh"
 
 # Default builds the installed sources and never pulls a published app image.
 : > "$TEST_LOG"
 unset TSCODE_IMAGE
-bash "$repo/install.sh"
+bash "$repo/install.sh" > "$work/install-output"
+if grep -q 'image id or pull summary' "$work/install-output"; then exit 1; fi
+[ "$(wc -l < "$work/install-output" | tr -d ' ')" = 1 ]
 "$cli" "$work/project space"
 [ "$(grep -c '^<build>$' "$TEST_LOG")" = 2 ]
 grep -Fx '<tscode:local>' "$TEST_LOG"
-grep -Fx "<$TSCODE_HOME/.tscode>" "$TEST_LOG"
+grep -Fx "<$TSCODE_HOME/.tscode/app>" "$TEST_LOG"
 if grep -qx '<pull>' "$TEST_LOG"; then exit 1; fi
-cmp "$repo/Dockerfile" "$TSCODE_HOME/.tscode/Dockerfile"
-cmp "$repo/config/bash-env" "$TSCODE_HOME/.tscode/config/bash-env"
+cmp "$repo/Dockerfile" "$TSCODE_HOME/.tscode/app/Dockerfile"
+cmp "$repo/config/bash-env" "$TSCODE_HOME/.tscode/app/config/bash-env"
 # Explicit image selection skips building.
 : > "$TEST_LOG"
 export TSCODE_IMAGE=tscode:test
@@ -124,7 +176,15 @@ if grep -qx '<build>' "$TEST_LOG"; then exit 1; fi
 
 # Resume attaches directly; updates work with and without a running workspace.
 : > "$TEST_LOG"
-CONTAINER_RUNNING=true "$cli" resume
+CONTAINER_RUNNING=true "$cli" resume > "$work/attach-output" 2>&1
+[ ! -s "$work/attach-output" ]
+CONTAINER_RUNNING=true ATTACH_MESSAGE='[exited]' "$cli" resume > "$work/attach-output" 2>&1
+[ ! -s "$work/attach-output" ]
+CONTAINER_RUNNING=true ATTACH_MESSAGE='[server exited unexpectedly]' ATTACH_ERROR='attach error' ATTACH_STATUS=7 \
+    "$cli" resume > "$work/attach-output" 2>&1 && exit 1 || attach_status=$?
+[ "$attach_status" = 7 ]
+grep -Fx '[server exited unexpectedly]' "$work/attach-output"
+grep -qx 'attach error' "$work/attach-output"
 grep -qx '<exec>' "$TEST_LOG"
 grep -qx '<-it>' "$TEST_LOG"
 grep -q 'exec tmux attach-session -t tscode' "$TEST_LOG"
@@ -145,6 +205,7 @@ DOCKER_STATUS=1 expect_failure "$cli" resume
 (
     tmux() { printf '%s\n' "$*" >> "$TEST_LOG"; }
     . "$repo/config/bash-env"
+    if declare -F shell carbonyl; then exit 1; fi
     : > "$TEST_LOG"
     tscode-detach
     tscode-exit
@@ -167,22 +228,24 @@ CONTAINER_RUNNING=true MANAGED=0 ENTRYPOINT=/unrelated expect_failure "$cli" res
 CONTAINER_RUNNING=true MANAGED=0 LEGACY=1 "$cli" resume
 printf 'saved failure diagnostics\n' > "$TSCODE_CONFIG_DIR/startup.log"
 DOCKER_STATUS=1 "$cli" logs | grep -x 'saved failure diagnostics'
-CONTAINER_RUNNING=true NOT_READY=1 STARTUP_FAILED=1 expect_failure "$cli" resume
+CONTAINER_RUNNING=true NOT_READY=1 STARTUP_FAILED=1 expect_failure "$cli" resume > "$work/failed-output" 2>&1
+[ "$(grep -c '^saved failure diagnostics$' "$work/failed-output")" = 1 ]
 "$cli" logs | grep -x 'saved failure diagnostics'
 TSCODE_CONFIG_DIR="$work/no-config" expect_failure "$cli" logs
 
-# Interrupting startup stops only the local follower, not the workspace.
+# Startup stays quiet; interrupting the wait leaves the workspace running.
 : > "$TEST_LOG"
 CONTAINER_RUNNING=true NOT_READY=1 "$cli" resume > "$work/wait-output" 2>&1 &
 waiting_cli=$!
 for ((attempt=0; attempt<50; attempt++)); do
-    if grep -q 'Waiting for startup' "$work/wait-output"; then break; fi
+    if grep -q 'Starting workspace' "$work/wait-output"; then break; fi
     sleep 0.1
 done
 kill -TERM "$waiting_cli"
 wait_status=0
 wait "$waiting_cli" || wait_status=$?
 [ "$wait_status" = 143 ]
+if grep -q 'saved failure diagnostics' "$work/wait-output"; then exit 1; fi
 if grep -Eq '^<(stop|kill|rm)>$' "$TEST_LOG"; then exit 1; fi
 
 # Linux passes host IDs; macOS keeps root behavior (including offline updates).
@@ -210,9 +273,11 @@ TSCODE_UID=123 TSCODE_GID='' expect_failure validate_workspace_user
 # Display defaults without creating config; existing values remain literal and unchanged.
 TSCODE_CONFIG_DIR="$work/no-config" "$conf" --show > "$work/shown"
 [ ! -e "$work/no-config" ]
-grep -qx 'panes=ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' "$work/shown"
+# shellcheck disable=SC2016 # Displaying defaults must not expand the command.
+grep -qxF 'panes=ranger;0:right:67:opencode;1:right:50:cha "${website:-https://www.google.com}";1:bottom:50:bash -i' "$work/shown"
+grep -qx 'website=https://www.google.com' "$work/shown"
 cp "$TSCODE_CONFIG_DIR/config.conf" "$work/before"
-"$conf" --show | grep -x panes=shell
+"$conf" --show | grep -x 'panes=bash -i'
 cmp "$work/before" "$TSCODE_CONFIG_DIR/config.conf"
 printf 'panes=bash\n' >> "$TSCODE_CONFIG_DIR/config.conf"
 expect_failure "$conf" --show
@@ -278,6 +343,10 @@ cmp "$work/expected" "$TEST_LOG"
 IMAGE_MISSING=1 bash "$repo/install.sh"
 grep -Fx '<pull>' "$TEST_LOG"
 if grep -qx '<build>' "$TEST_LOG"; then exit 1; fi
+IMAGE_MISSING=1 IMAGE_FAILED=1 expect_failure bash "$repo/install.sh" > "$work/image-failure" 2>&1
+grep -qx 'image preparation failed' "$work/image-failure"
+TSCODE_IMAGE='' IMAGE_FAILED=1 expect_failure bash "$repo/install.sh" > "$work/image-failure" 2>&1
+grep -qx 'image preparation failed' "$work/image-failure"
 
 # Package installer helpers.
 . "$repo/scripts/tools.sh"

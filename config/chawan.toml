@@ -1,0 +1,6 @@
+[buffer]
+scripting = true
+cookie = true
+
+[page]
+f = 'toggleLinkHintsAutoClick'

@@ -22,10 +22,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The image contains recipes, not application packages.
+# The image includes Chawan; other application packages are installed at startup.
 docker run --rm --platform "$platform" --entrypoint bash "$image" -ec '
     test "$HOME" = /home/tscode
-    for tool in ranger opencode carbonyl tmux git node npm javac rustc gcc; do
+    cha --version
+    for tool in ranger opencode tmux git node npm javac rustc gcc; do
         if type -P "$tool"; then echo "Unexpected bundled tool: $tool"; exit 1; fi
     done
 '
@@ -35,7 +36,7 @@ prepare_storage "$image" "$prefix"
 mounts=("${storage_mounts[@]}" -v "$work:/config" -v "$repo/tests:/tests:ro")
 
 docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash -ec '
-    for tool in ranger file nano sensible-editor opencode carbonyl tmux git node npm; do type -P "$tool"; done
+    for tool in ranger file nano sensible-editor opencode cha tmux git node npm; do type -P "$tool"; done
     for tool in javac rustc gcc; do
         if type -P "$tool"; then echo "Unexpected optional tool: $tool"; exit 1; fi
     done
@@ -47,7 +48,9 @@ docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash -ec '
 
 # Real startup with the default commands and an arbitrary command layout.
 docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash /tests/layout.sh /tscode
-for panes in 'ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' 'shell;0:right:50:printf "%s" "https://example.com/a:b" > /config/command-output && shell'; do
+docker run --rm --platform "$platform" "${mounts[@]}" "$image" bash /tests/browser.sh /tscode
+# shellcheck disable=SC2016 # Expand the homepage inside the pane, not on the host.
+for panes in 'ranger;0:right:67:opencode;1:right:50:cha "${website:-https://www.google.com}";1:bottom:50:bash -i' 'bash -i;0:right:50:printf "%s" "https://example.com/a:b" > /config/command-output && bash -i'; do
     container=$(docker run -dit --rm --platform "$platform" "${mounts[@]}" -e "panes=$panes" "$image")
     ready=0
     for ((attempt=0; attempt<60; attempt++)); do
@@ -56,7 +59,7 @@ for panes in 'ranger;0:right:67:opencode;1:right:50:carbonyl;1:bottom:50:shell' 
     done
     if [ "$ready" != 1 ]; then docker logs "$container"; exit 1; fi
     expected=4
-    case "$panes" in shell*) expected=2 ;; esac
+    case "$panes" in 'bash -i'*) expected=2 ;; esac
     [ "$(docker exec "$container" tmux list-panes -t tscode:0 | wc -l | tr -d ' ')" = "$expected" ]
     if [ "$expected" = 2 ]; then
         for ((attempt=0; attempt<50; attempt++)); do
